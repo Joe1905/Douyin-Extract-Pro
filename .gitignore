@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+venv/
+.venv/
+backend/temp_downloads/
+
+# Node
+node_modules/
+build/
+.DS_Store
+
+# IDE
+.idea/
+.vscode/

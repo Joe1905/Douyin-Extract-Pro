@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+pydantic
+playwright
+google-genai
+openai # 新增
+python-dotenv
+httpx
+keyring
