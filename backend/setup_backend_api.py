@@ -31,8 +31,6 @@ def check_ffmpeg():
 def install_dependencies():
     print_step("安装核心依赖库")
     packages = [
-        "yt-dlp",              # 视频/音频下载
-        "google-generativeai", # Gemini API
         "fastapi",             # Web 框架
         "uvicorn",             # ASGI 服务器
         "python-dotenv",       # 环境变量管理

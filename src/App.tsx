@@ -58,7 +58,6 @@ const Card: React.FC<{ title: string; icon: React.ReactNode; children: React.Rea
 
 const ImagePreviewModal: React.FC<{ src: string; onClose: () => void }> = ({ src, onClose }) => (
   <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50" onClick={onClose}>
-    {/* 允许原生右键菜单 */}
     <img src={src} alt="全屏预览" className="max-w-[90vw] max-h-[90vh] object-contain" onClick={(e) => e.stopPropagation()} />
   </div>
 );
@@ -106,7 +105,7 @@ const App: React.FC = () => {
   const isProcessing = ['fetching_media', 'splitting_audio', 'processing_asr', 'analyzing_ai'].includes(status);
 
   const handleNewTask = () => {
-    if (isProcessing) return; 
+    if (isProcessing) return;
     setResult(null);
     setStatus('idle');
     setLogs([]);
@@ -115,8 +114,10 @@ const App: React.FC = () => {
 
   const handleSelectHistory = (item: HistoryItem) => {
     if (isProcessing) return;
+    // 重置状态以触发重绘
     setResult(null);
     setLogs([]);
+
     setTimeout(() => {
         setResult({
             ts: item.ts,
@@ -126,30 +127,30 @@ const App: React.FC = () => {
             frames: item.frames,
             xhs_copy: item.xhs_copy
         });
-        setStatus('success'); 
+        setStatus('success');
     }, 0);
   };
 
   const handleDeleteHistory = async (ts: string, e: React.MouseEvent) => {
-    e.stopPropagation(); 
+    e.stopPropagation();
     if (isProcessing) return;
     if (!window.confirm(`确定要删除任务 ${ts} 吗？此操作不可逆。`)) return;
 
-    setDeletingTs(ts); 
+    setDeletingTs(ts);
     try {
         const response = await fetch(`http://localhost:8000/api/v1/history/${ts}`, { method: 'DELETE' });
         if (!response.ok) {
             const err = await response.json();
             throw new Error(err.detail);
         }
-        fetchHistory(); 
+        fetchHistory();
         if (result?.ts === ts) {
             handleNewTask();
         }
     } catch (error) {
         alert(`删除失败: ${error}`);
     } finally {
-        setDeletingTs(null); 
+        setDeletingTs(null);
     }
   };
 
@@ -164,12 +165,11 @@ const App: React.FC = () => {
       return;
     }
 
-    // 2. 强制零态初始化
     setResult(null);
-    setLogs([]); 
+    setLogs([]);
     setStatus('fetching_media');
     setLogs(['[1/5] 正在初始化任务...']);
-    
+
     try {
       const response = await fetch('http://localhost:8000/api/v1/stream-process', {
         method: 'POST',
@@ -188,22 +188,22 @@ const App: React.FC = () => {
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
-        buffer = lines.pop() || ''; 
+        buffer = lines.pop() || '';
         for (const line of lines) {
           if (!line.trim()) continue;
           try {
             const msg = JSON.parse(line);
-            
+
             if (msg.error) {
                 console.error("Backend Error:", msg.error);
                 throw new Error(msg.error);
             }
-            
+
             if (msg.step === 'splitting_audio') setStatus('splitting_audio');
             if (msg.step === 'asr_processing') setStatus('processing_asr');
             if (msg.step === 'analyzing') setStatus('analyzing_ai');
             if (msg.message) setLogs(prev => [...prev.slice(-5), msg.message]);
-            
+
             if (msg.step === 'done') {
               if (!msg.data.script && (!msg.data.frames || msg.data.frames.length === 0)) {
                   throw new Error("提取失败：未获取到有效的视频素材");
@@ -213,9 +213,9 @@ const App: React.FC = () => {
               setLogs([]);
               fetchHistory();
             }
-          } catch (e) { 
+          } catch (e) {
               if (e instanceof Error) throw e;
-              console.warn('Parse error:', e); 
+              console.warn('Parse error:', e);
           }
         }
       }
@@ -264,6 +264,15 @@ const App: React.FC = () => {
       URL.revokeObjectURL(url);
   };
 
+  const handleDownloadImage = (imageUrl: string) => {
+    const a = document.createElement('a');
+    a.href = imageUrl;
+    a.download = imageUrl.split('/').pop() || 'frame.jpg';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
   const getStatusText = () => {
     switch (status) {
       case 'fetching_media': return '解析中 (1/5)...';
@@ -276,17 +285,18 @@ const App: React.FC = () => {
     }
   };
 
-  // 1. 物理隔离：确保状态切换时 DOM 彻底重建
-  const containerKey = result?.ts || status;
+  // 全局唯一 Key，用于强制重绘整个主内容区
+  const globalKey = `${result?.ts || 'init'}-${status}`;
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    // 1. 物理屏蔽：translate="no" 阻止翻译插件干扰
+    <div className="flex min-h-screen bg-gray-50" translate="no">
       <aside className="w-72 bg-white border-r border-gray-200 p-4 space-y-3 flex-shrink-0 h-screen sticky top-0 overflow-hidden flex flex-col">
         <div className="flex items-center justify-between flex-shrink-0">
             <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2"><History size={18}/> 历史记录</h2>
-            <button 
-                onClick={handleNewTask} 
-                disabled={isProcessing} 
+            <button
+                onClick={handleNewTask}
+                disabled={isProcessing}
                 className={`flex items-center gap-1 text-sm p-1 rounded-md bg-blue-50 transition-colors px-2 py-1 ${isProcessing ? 'text-gray-400 cursor-not-allowed opacity-50' : 'text-blue-600 hover:text-blue-800 hover:bg-blue-100'}`}
             >
                 <Plus size={14}/> 新建
@@ -295,9 +305,9 @@ const App: React.FC = () => {
         <div className="space-y-2 overflow-y-auto flex-grow pr-1">
           {history.map(item => (
             <div key={item.ts} className={`group relative w-full text-left p-2 rounded-md transition-colors ${result?.ts === item.ts ? 'bg-blue-50 border border-blue-200' : 'hover:bg-gray-100'} ${isProcessing ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}`}>
-                <button onClick={() => handleSelectHistory(item)} className="w-full" disabled={isProcessing}>
+                <button onClick={() => handleSelectHistory(item)} className="w-full">
                     <div className="flex items-center gap-3">
-                        {item.cover ? 
+                        {item.cover ?
                         <img src={item.cover} alt={item.title} className="w-16 h-10 object-cover rounded-md flex-shrink-0" /> :
                         <div className="w-16 h-10 bg-gray-200 rounded-md flex-shrink-0" />
                         }
@@ -307,9 +317,9 @@ const App: React.FC = () => {
                         </div>
                     </div>
                 </button>
-                <button 
-                    onClick={(e) => handleDeleteHistory(item.ts, e)} 
-                    disabled={deletingTs === item.ts || isProcessing} 
+                <button
+                    onClick={(e) => handleDeleteHistory(item.ts, e)}
+                    disabled={deletingTs === item.ts || isProcessing}
                     className="absolute top-1 right-1 p-1.5 rounded-md bg-white/80 text-gray-400 hover:bg-red-100 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm disabled:cursor-not-allowed"
                 >
                     {deletingTs === item.ts ? <Loader size={14} className="animate-spin" /> : <Trash2 size={14} />}
@@ -321,45 +331,51 @@ const App: React.FC = () => {
 
       <main className="flex-grow p-10 h-screen overflow-y-auto">
         <div className="w-full max-w-6xl mx-auto">
-          {/* 常驻顶部控制区 */}
-          <div className="max-w-3xl mx-auto mb-8">
-              <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200/80 overflow-hidden">
-                <button onClick={() => setIsConfigOpen(!isConfigOpen)} className="w-full flex items-center justify-between p-4 hover:bg-gray-50">
-                  <div className="flex items-center gap-2 text-gray-700">
-                    <Settings size={18} />
-                    <span className="font-medium">API 设置</span>
-                    {apiConfig?.apiKey ? <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">已配置</span> : <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">未配置</span>}
+          <header className="flex items-center justify-center gap-3 mb-8">
+            <Film className="text-gray-700" size={32} />
+            <h1 className="text-3xl font-bold text-gray-800">抖音爆款提取工具 Pro</h1>
+          </header>
+
+          {/* 2. 动态区域顶层锁：Key 变化时销毁重建整个内容区 */}
+          <div key={globalKey}>
+              {/* 常驻顶部控制区 */}
+              <div className="max-w-3xl mx-auto mb-8">
+                  <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200/80 overflow-hidden">
+                    <button onClick={() => setIsConfigOpen(!isConfigOpen)} className="w-full flex items-center justify-between p-4 hover:bg-gray-50">
+                      <div className="flex items-center gap-2 text-gray-700">
+                        <Settings size={18} />
+                        <span className="font-medium">API 设置</span>
+                        {apiConfig?.apiKey ? <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">已配置</span> : <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">未配置</span>}
+                      </div>
+                      {isConfigOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                    </button>
+                    {isConfigOpen && <div className="p-4 border-t"><ApiConfig onConfigChange={setApiConfig} /></div>}
                   </div>
-                  {isConfigOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                </button>
-                {isConfigOpen && <div className="p-4 border-t"><ApiConfig onConfigChange={setApiConfig} /></div>}
+
+                  <div className="relative mb-4">
+                    <input type="text" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="粘贴抖音视频链接开始新任务..." className="w-full pl-4 pr-36 py-4 text-base border rounded-lg focus:ring-2 focus:ring-blue-500 shadow-sm disabled:bg-gray-50" disabled={status !== 'idle' && status !== 'success' && status !== 'error'} />
+                    <button onClick={handleProcess} disabled={status !== 'idle' && status !== 'success' && status !== 'error' || !url} className="absolute right-2 top-1/2 -translate-y-1/2 bg-blue-600 text-white px-5 py-2.5 rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400 flex items-center gap-2">
+                      {status !== 'idle' && status !== 'success' && status !== 'error' ? <Loader size={16} className="animate-spin" /> : null}
+                      {getStatusText()}
+                    </button>
+                  </div>
+
+                  {status !== 'idle' && status !== 'success' && logs.length > 0 && (
+                    <div className="mb-8 p-4 bg-gray-800 text-white rounded-lg font-mono text-xs space-y-1 max-h-40 overflow-y-auto">
+                      {logs.map((log, i) => <p key={i} className="whitespace-pre-wrap">{`> ${log}`}</p>)}
+                    </div>
+                  )}
               </div>
 
-              <div className="relative mb-4">
-                <input type="text" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="粘贴抖音视频链接开始新任务..." className="w-full pl-4 pr-36 py-4 text-base border rounded-lg focus:ring-2 focus:ring-blue-500 shadow-sm disabled:bg-gray-50" disabled={status !== 'idle' && status !== 'success' && status !== 'error'} />
-                <button onClick={handleProcess} disabled={status !== 'idle' && status !== 'success' && status !== 'error' || !url} className="absolute right-2 top-1/2 -translate-y-1/2 bg-blue-600 text-white px-5 py-2.5 rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400 flex items-center gap-2">
-                  {status !== 'idle' && status !== 'success' && status !== 'error' ? <Loader size={16} className="animate-spin" /> : null}
-                  {getStatusText()}
-                </button>
-              </div>
-
-              {status !== 'idle' && status !== 'success' && logs.length > 0 && (
-                <div className="mb-8 p-4 bg-gray-800 text-white rounded-lg font-mono text-xs space-y-1 max-h-40 overflow-y-auto">
-                  {logs.map((log, i) => <p key={i} className="whitespace-pre-wrap">{`> ${log}`}</p>)}
-                </div>
-              )}
-          </div>
-
-          <div key={containerKey}>
+              {/* 结果区域 */}
               {result && result.frames && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-10">
                   <div className="space-y-6">
                      {result.audio_rel_path && (
                          <div className="bg-black rounded-lg overflow-hidden shadow-lg aspect-video">
-                            <video 
-                                key={result.ts} 
-                                src={`http://localhost:8000/downloads/${result.audio_rel_path}`} 
-                                controls 
+                            <video
+                                src={`http://localhost:8000/downloads/${result.audio_rel_path}`}
+                                controls
                                 className="w-full h-full"
                                 preload="auto"
                             />
@@ -367,9 +383,9 @@ const App: React.FC = () => {
                      )}
 
                      <div key={`${result.ts}-script-editor`}>
-                        <Card 
-                            title="转录脚本 (可编辑)" 
-                            icon={<FileText size={18} />} 
+                        <Card
+                            title="转录脚本 (可编辑)"
+                            icon={<FileText size={18} />}
                             copyContent={editableScript}
                             extraAction={
                                 <button onClick={handleDownloadScript} className="text-gray-400 hover:text-gray-600 p-1" title="下载脚本">
@@ -377,12 +393,12 @@ const App: React.FC = () => {
                                 </button>
                             }
                         >
-                            <textarea 
+                            <textarea
                                 value={editableScript}
                                 onChange={(e) => setEditableScript(e.target.value)}
-                                className="w-full h-96 p-3 text-sm text-gray-700 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono resize-y"
+                                className="w-full h-96 p-3 text-sm text-gray-700 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 font-mono resize-y"
                             />
-                            <button 
+                            <button
                                 onClick={() => handleReSummarize(result.ts, editableScript)}
                                 disabled={isGenerating}
                                 className="mt-3 w-full bg-blue-100 text-blue-700 py-2 rounded-md font-medium hover:bg-blue-200 flex items-center justify-center gap-2"
@@ -400,9 +416,9 @@ const App: React.FC = () => {
                             <p className="text-xs text-gray-400 mb-3 -mt-2">💡 提示：点击图片可查看原图，右键“图片另存为”可下载。</p>
                             <div className="grid grid-cols-3 gap-3">
                                 {result.frames.map((path, i) => (
-                                    <div 
-                                        key={`${result.ts}-frame-${i}`} 
-                                        className="group relative aspect-video bg-gray-100 rounded-lg overflow-hidden border cursor-pointer hover:shadow-md transition-shadow" 
+                                    <div
+                                        key={`${result.ts}-frame-${i}`}
+                                        className="group relative aspect-video bg-gray-100 rounded-lg overflow-hidden border cursor-pointer hover:shadow-md transition-shadow"
                                         onClick={() => setPreviewImage(path)}
                                     >
                                         <img src={path} alt={`Frame ${i}`} className="w-full h-full object-cover"/>
