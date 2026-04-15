@@ -1,3 +1,136 @@
+# VideoExtract Pro (抖音爆款提取工具)
+
+[![Python](https://img.shields.io/badge/Python-3.9%2B-blue)](https://www.python.org/)
+[![React](https://img.shields.io/badge/React-18-blue)](https://reactjs.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.100%2B-green)](https://fastapi.tiangolo.com/)
+[![Playwright](https://img.shields.io/badge/Playwright-Chromium-orange)](https://playwright.dev/)
+
+VideoExtract is a full-stack short video content analysis and repurposing platform. It uses automated browser technology to scrape Douyin (Chinese TikTok) videos, leverages FFmpeg for precise multi-modal processing (keyframes, audio slices), and integrates AI models like PPIO (ASR/LLM) or Google Gemini to generate Xiaohongshu (Little Red Book) style viral captions with one click.
+
+## ✨ Key Features
+
+*   **Fully Automated Pipeline**: From URL parsing, video downloading, keyframe extraction, and speech-to-text transcription to AI caption generation — everything flows seamlessly.
+*   **Multi-modal Extraction**: Not just video downloading — automatically captures keyframes at 0/50/90% positions and generates precise word-by-word transcripts.
+*   **Streaming Response (SSE)**: Backend uses Server-Sent Events technology; frontend displays real-time progress for each processing step (e.g., slicing audio, transcribing segment 3/5...).
+*   **Human-in-the-Loop**: Supports online video preview, **manual ASR script proofreading**, and **secondary generation** based on modified scripts for precise content correction.
+*   **Historical Asset Management**: All tasks are archived by timestamp, supporting historical record lookup, instant loading, and physical deletion.
+*   **Robust Design**: Frontend uses physical isolation rendering strategy (Key-based Remounting) to completely prevent React DOM conflicts; backend has complete error handling and resource cleanup mechanisms.
+
+---
+
+## 🛠️ Tech Stack
+
+### Backend
+*   **Core Framework**: FastAPI (Python 3.9+)
+*   **Web Automation**: Playwright (Chromium engine only, headless/headed mode optional)
+*   **Media Processing**: FFmpeg (audio transcoding, slicing, screenshots)
+*   **HTTP Client**: httpx (full async HTTP client, proxy support)
+*   **AI SDK**: Google GenAI, OpenAI (PPIO protocol compatible)
+
+### Frontend
+*   **Core Library**: React 18
+*   **Language**: TypeScript
+*   **Styling**: Tailwind CSS
+*   **Icons**: Lucide React
+
+---
+
+## 🚀 Setup & Running
+
+### Prerequisites
+*   **FFmpeg**: Must be pre-installed with `ffmpeg` and `ffprobe` commands available in system PATH.
+*   **Python**: 3.9 or higher.
+*   **Node.js**: 16.x or higher.
+
+### 1. Backend Setup
+
+```bash
+cd backend
+
+# 1. Create and activate virtual environment (recommended)
+python -m venv venv
+# Windows:
+.\venv\Scripts\activate
+# Mac/Linux:
+source venv/bin/activate
+
+# 2. Install dependencies
+pip install fastapi uvicorn playwright httpx openai google-genai python-dotenv
+
+# 3. Initialize Playwright Chromium browser
+playwright install chromium
+
+# 4. Start server
+python main.py
+```
+Backend will start at `http://localhost:8000`.
+
+### 2. Frontend Setup
+
+```bash
+# Back to project root, then go to the directory where package.json is
+# (usually root or frontend directory, depending on project structure)
+npm install
+
+# Start development server
+npm start
+```
+Frontend will start at `http://localhost:3000`.
+
+### 3. API Configuration
+On first run, click **"API Settings"** in the top-right corner of the page:
+*   **Provider**: Select PPIO (recommended) or Gemini.
+*   **API Key**: Enter your API key.
+*   **Proxy**: If you need to access overseas APIs (like Gemini), enter your local proxy address (e.g., `http://127.0.0.1:7890`); domestic APIs (like PPIO) can be used directly without proxy.
+
+---
+
+## 🧠 Core Logic Contracts
+
+### 1. Physical Storage Isolation
+All task outputs are stored in `backend/temp_downloads/{TIMESTAMP}/` directory, containing:
+*   `audio.m4a`: Original audio.
+*   `frames/`: Keyframe screenshots (frame_00.jpg, frame_50.jpg, frame_90.jpg).
+*   `chunks/`: Audio slices for ASR (30s per slice).
+*   `script.txt`: ASR transcription script.
+*   `xhs_copy.txt`: Latest AI-generated captions.
+*   `metadata.json`: Video title, description, and other metadata.
+
+### 2. Rendering Stability (Frontend)
+To solve React rendering crashes caused by complex async state transitions (e.g., `Failed to execute 'insertBefore'`), the result display area uses **physical isolation rendering** strategy:
+```tsx
+// Use key to force React to destroy and rebuild the entire DOM tree on task switching
+<div key={result?.ts || status}>
+  {/* Result display components */}
+</div>
+```
+
+### 3. Atomic Deletion (Backend)
+When executing deletion, the backend calls `shutil.rmtree` to completely remove the corresponding folder, ensuring disk space is effectively released without "soft deletion" or residual files.
+
+---
+
+## 📖 User Guide
+
+1.  **New Task Extraction**:
+    *   Paste a Douyin video link in the top input box (short URLs supported).
+    *   Click "Start Extraction" and observe the terminal-style log stream below.
+    *   Wait for the progress bar to complete (parsing -> downloading -> slicing -> transcription -> analysis).
+
+2.  **Material Proofreading & Editing**:
+    *   The left video player previews the original video.
+    *   The script editor below displays ASR transcription results. **You can directly edit typos or adjust sentences here**.
+
+3.  **Secondary Generation (Human-in-the-loop)**:
+    *   After modifying the script, click the **"Generate/Update Caption Based on Current Script"** button below the editor.
+    *   The system will skip the time-consuming download process and directly send your modified text to the LLM to generate new viral captions in seconds.
+
+4.  **Historical Lookup**:
+    *   The left sidebar lists all historical tasks.
+    *   Click any item to instantly switch the interface to that task's state (no reloading required).
+
+---
+
 # 抖音爆款提取工具 Pro (VideoExtract)
 
 [![Python](https://img.shields.io/badge/Python-3.9%2B-blue)](https://www.python.org/)
